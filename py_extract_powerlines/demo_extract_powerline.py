@@ -140,7 +140,7 @@ def main():
     print()
     
     # Configuration - Same parameters as MATLAB
-    data_path = "../pointcloud_files"
+    data_path = "/home/lambdayin/Code-Projects/maircro-projects/detection/3d/PowerLine-Detection-3D/pointcloud_files"
     radius = 0.5           # Neighborhood search radius  
     angle_thr = 10         # Angle threshold in degrees
     l_thr = 0.98          # Linearity threshold

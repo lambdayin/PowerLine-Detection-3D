@@ -1,21 +1,13 @@
-# Python版电力线提取系统
-
-本目录包含了从MATLAB代码完整转换的Python版本电力线提取算法，保持了所有原始参数和处理逻辑。
+# Python版电力线提取
 
 ## 🚀 快速开始
 
 ### 1. 安装依赖
 ```bash
-cd project-development
 pip install -r requirements.txt
 ```
 
-### 2. 快速体验
-```bash
-python quick_start.py
-```
-
-### 3. 完整运行
+### 2. 完整运行
 ```bash
 python demo_extract_powerline.py
 ```
@@ -30,7 +22,7 @@ python demo_extract_powerline.py
 | `quick_start.py` | 快速演示程序 | - |
 | `requirements.txt` | Python依赖包 | - |
 
-## 🔧 算法参数（与MATLAB完全一致）
+## 🔧 算法参数
 
 - **radius = 0.5**: 邻域搜索半径
 - **angle_thr = 10**: 角度阈值（度）
@@ -84,26 +76,6 @@ python demo_extract_powerline.py
 - 适当降低 `l_thr` (如0.95-0.97)
 - 调整 `angle_thr` 范围
 
-## 🐛 故障排除
-
-### 常见问题：
-
-1. **找不到文件**: 检查点云文件是否在正确路径
-2. **内存不足**: 减少处理的点云数量或增加系统内存
-3. **没有检测到电力线**: 调整算法参数，特别是 `l_thr` 和 `angle_thr`
-4. **可视化不显示**: 确保图形界面可用，或检查matplotlib配置
-
-### 调试技巧：
-- 运行 `quick_start.py` 进行快速测试
-- 检查中间结果的点数量是否合理
-- 使用较小的数据集进行参数调试
-
 ## 📚 算法详解
 
 详细的算法逻辑和处理流程说明请参考：[算法逻辑与处理流程.md](算法逻辑与处理流程.md)
-
-## 📖 引用
-
-如果使用本代码，请引用原始论文：
-
-Zhenwei Shi, Yi Lin, and Hui Li. "Extraction of urban power lines and potential hazard analysis from mobile laser scanning point clouds." International Journal of Remote Sensing 41, no. 9 (2020): 3411-3428.
