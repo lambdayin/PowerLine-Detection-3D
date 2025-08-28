@@ -89,15 +89,31 @@ def load_point_cloud_data(data_path, file_numbers=[8, 9, 10]):
 
 def visualize_points_3d(points, title="Point Cloud", colors=None, save_path=None):
     """
-    Visualize 3D point cloud
+    Visualize 3D point cloud with proper aspect ratio matching MATLAB pcshow
     """
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection='3d')
     
     if colors is None:
-        ax.scatter(points[:, 0], points[:, 1], points[:, 2], s=0.5, alpha=0.6)
+        ax.scatter(points[:, 0], points[:, 1], points[:, 2], c=points[:, 2], s=0.5, alpha=0.6, cmap='viridis')
     else:
         ax.scatter(points[:, 0], points[:, 1], points[:, 2], c=colors, s=0.5, alpha=0.6)
+    
+    # Calculate data ranges
+    x_range = points[:, 0].max() - points[:, 0].min()
+    y_range = points[:, 1].max() - points[:, 1].min()
+    z_range = points[:, 2].max() - points[:, 2].min()
+    
+    # Set axis limits with some padding
+    padding = 0.1
+    ax.set_xlim(points[:, 0].min() - x_range * padding, points[:, 0].max() + x_range * padding)
+    ax.set_ylim(points[:, 1].min() - y_range * padding, points[:, 1].max() + y_range * padding)
+    ax.set_zlim(points[:, 2].min() - z_range * padding, points[:, 2].max() + z_range * padding)
+    
+    # Set equal aspect ratio for better visualization
+    # Method 1: Force equal aspect ratio
+    max_range = max(x_range, y_range, z_range)
+    ax.set_box_aspect([x_range/max_range, y_range/max_range, z_range/max_range])
     
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
@@ -140,7 +156,7 @@ def main():
     print()
     
     # Configuration - Same parameters as MATLAB
-    data_path = "/home/lambdayin/Code-Projects/maircro-projects/detection/3d/PowerLine-Detection-3D/pointcloud_files"
+    data_path = "./pointcloud_files"
     radius = 0.5           # Neighborhood search radius  
     angle_thr = 10         # Angle threshold in degrees
     l_thr = 0.98          # Linearity threshold
