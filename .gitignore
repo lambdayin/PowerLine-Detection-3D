@@ -4,3 +4,4 @@ __pycache__/
 pointcloud_files/
 *.png
 pcd_output/
+*.pcd
