@@ -95,28 +95,29 @@ def visualize_points_3d(points, title="Point Cloud", colors=None, save_path=None
     ax = fig.add_subplot(111, projection='3d')
     
     if colors is None:
-        ax.scatter(points[:, 0], points[:, 1], points[:, 2], c=points[:, 2], s=0.5, alpha=0.6, cmap='viridis')
+        ax.scatter(points[:, 1], points[:, 0], points[:, 2], c=points[:, 2], s=0.5, alpha=0.6, cmap='viridis')
     else:
-        ax.scatter(points[:, 0], points[:, 1], points[:, 2], c=colors, s=0.5, alpha=0.6)
+        ax.scatter(points[:, 1], points[:, 0], points[:, 2], c=colors, s=0.5, alpha=0.6)
     
-    # Calculate data ranges
+    # Calculate data ranges (original axes)
     x_range = points[:, 0].max() - points[:, 0].min()
     y_range = points[:, 1].max() - points[:, 1].min()
     z_range = points[:, 2].max() - points[:, 2].min()
     
-    # Set axis limits with some padding
+    # Set axis limits with some padding (swapped for display)
     padding = 0.1
-    ax.set_xlim(points[:, 0].min() - x_range * padding, points[:, 0].max() + x_range * padding)
-    ax.set_ylim(points[:, 1].min() - y_range * padding, points[:, 1].max() + y_range * padding)
+    # ax.set_xlim(points[:, 1].min() - y_range * padding, points[:, 1].max() + y_range * padding)
+    ax.set_xlim(points[:, 1].max() + y_range * padding, points[:, 1].min() - x_range * padding)
+    ax.set_ylim(points[:, 0].min() - x_range * padding, points[:, 0].max() + x_range * padding)
     ax.set_zlim(points[:, 2].min() - z_range * padding, points[:, 2].max() + z_range * padding)
     
     # Set equal aspect ratio for better visualization
-    # Method 1: Force equal aspect ratio
+    # Method 1: Force equal aspect ratio (swapped for display)
     max_range = max(x_range, y_range, z_range)
-    ax.set_box_aspect([x_range/max_range, y_range/max_range, z_range/max_range])
+    ax.set_box_aspect([y_range/max_range, x_range/max_range, z_range/max_range])
     
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
+    ax.set_xlabel('Y')
+    ax.set_ylabel('X')
     ax.set_zlabel('Z')
     ax.set_title(title)
     ax.view_init(elev=25, azim=60)  # Same view as MATLAB
