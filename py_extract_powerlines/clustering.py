@@ -32,16 +32,23 @@ def euclidean_clustering(points, min_distance):
         num_clusters: Number of clusters found
     """
     # Use DBSCAN for clustering (eps = min_distance, min_samples = 1)
+    # min_distance：聚类的最小距离阈值，如果两点之间的距离小于这个值，它们可能被分到同一簇
+    # min_samples：确保每个点都会被分配到一个簇，即使是离群点
     clustering = DBSCAN(eps=min_distance, min_samples=1).fit(points)
     labels = clustering.labels_
     
     # Convert -1 (noise) to separate clusters
+    # 备用逻辑：处理DBSCAN可能产生的噪声点(标签为-1)
+    # 尽管因为min_samples=1理论上不会产生噪声点，但依然保留此逻辑增强代码鲁棒性
     unique_labels = np.unique(labels)
     if -1 in unique_labels:
         # Reassign noise points to individual clusters
+        # 如果存在标签为-1的噪声点，则将每个噪声点重新分配为一个独立的簇
         noise_mask = labels == -1
         noise_indices = np.where(noise_mask)[0]
+        # 找到下一个可用的簇标签ID
         next_label = max(labels) + 1
+        # 便利所有噪声点，并为它们分配新的、唯一的簇标签
         for idx in noise_indices:
             labels[idx] = next_label
             next_label += 1

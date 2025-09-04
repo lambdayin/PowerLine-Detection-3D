@@ -5,3 +5,5 @@ pointcloud_files/
 *.png
 pcd_output/
 *.pcd
+*.txt
+*.las

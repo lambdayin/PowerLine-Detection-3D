@@ -1,14 +1,14 @@
 """
-Power Line Extraction from Mobile LiDAR Point Cloud - Python Version
-Converted from MATLAB code with identical parameters and processing logic
+Power Line Extraction from LAS Point Cloud Files - Python Version
+Based on demo_extract_powerline.py, modified to process single LAS files
 
-This script demonstrates the complete power line extraction pipeline:
-1. Mobile LiDAR filtering (ground removal)
+This script processes single LAS point cloud files for power line extraction:
+1. LAS file loading and ground removal
 2. Candidate power line point extraction
 3. Euclidean clustering
 4. Power line modeling and refinement
 
-Original MATLAB implementation by:
+Original algorithm by:
 Zhenwei Shi, Yi Lin, and Hui Li
 "Extraction of urban power lines and potential hazard analysis from mobile laser scanning point clouds."
 International Journal of Remote Sensing 41, no. 9 (2020): 3411-3428.
@@ -17,78 +17,69 @@ International Journal of Remote Sensing 41, no. 9 (2020): 3411-3428.
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-import scipy.io
 import time
 import os
+import laspy
 from utils import extract_pls, insert_3d
 from clustering import (euclidean_clustering, create_power_line_structure, 
                        merge_power_lines, filter_short_power_lines, 
                        calculate_total_length)
 
-def load_point_cloud_data(data_path, file_numbers=[8, 9, 10]):
+def load_las_point_cloud_data(las_path):
     """
-    Load and combine multiple point cloud files
-    Equivalent to MATLAB's loading section
+    Load and process LAS point cloud file with ground filtering
+    
+    Args:
+        las_path: Path to the LAS file
+        
+    Returns:
+        non_ground_points: Filtered non-ground points (N x 3 array)
     """
-    print("Loading point cloud data...")
-    non_ground_points = []
+    print(f"Loading LAS point cloud data from: {las_path}")
     
-    for i in file_numbers:
-        filename = f'L037_Sens1_600x250_cloud_{i}.mat'
-        filepath = os.path.join(data_path, filename)
-        
-        if not os.path.exists(filepath):
-            print(f"Warning: File {filepath} not found, skipping...")
-            continue
-            
-        print(f"Loading {filename}...")
-        
-        # Load MATLAB .mat file
-        mat_data = scipy.io.loadmat(filepath)
-        
-        # Extract point cloud data (assuming structure similar to MATLAB)
-        # May need adjustment based on actual .mat file structure
-        if 'ptCloudA' in mat_data:
-            pt_data = mat_data['ptCloudA']['data'][0][0]
-        else:
-            # Try alternative structures
-            keys = [k for k in mat_data.keys() if not k.startswith('__')]
-            if keys:
-                pt_data = mat_data[keys[0]]
-            else:
-                print(f"Could not find point cloud data in {filename}")
-                continue
-        
-        # Ground filtering using histogram analysis (same as MATLAB)
-        z_coords = pt_data[:, 2] # extract the Z coordinates (elevation) of all points
-        
-        # Create histogram with 50 bins
-        # z_coords are the Z-coordinate values (elevation values) for all points. Divides the range of Z-coordinates into 50 equally spaced intervals.
-        counts, bin_edges = np.histogram(z_coords, bins=50)  # counts: The number of points within each interval. bin_edges: The boundary values that define the intervals.
-        centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        
-        # Find bin with maximum count
-        # 找到点数最多的那个区间，核心假设：地面是场景中面积最大的连续表面，因此地面点在某个高度上会特别集中。
-        max_idx = np.argmax(counts)
-        
-        # Ground threshold: 3 bins above the maximum density height
-        # 确定地面高度阈值，以点数最密集的区间的中心高度为基准，再向上浮动3个区间的高度。
-        ground_height = centers[min(max_idx + 3, len(centers) - 1)]
-        
-        # Extract non-ground points
-        non_ground_mask = pt_data[:, 2] > ground_height
-        non_ground_data = pt_data[non_ground_mask, :3]  # Take only x,y,z
-        
-        non_ground_points.append(non_ground_data)
-        print(f"  Loaded {non_ground_data.shape[0]} non-ground points")
+    if not os.path.exists(las_path):
+        raise FileNotFoundError(f"LAS file not found: {las_path}")
     
-    # Combine all non-ground points
-    if non_ground_points:
-        combined_points = np.vstack(non_ground_points)
-        print(f"Total non-ground points: {combined_points.shape[0]}")
-        return combined_points
-    else:
-        raise ValueError("No point cloud data could be loaded")
+    # Load LAS file
+    try:
+        las_file = laspy.read(las_path)
+        print(f"Successfully loaded LAS file with {len(las_file.points)} points")
+    except Exception as e:
+        raise RuntimeError(f"Failed to load LAS file: {e}")
+    
+    # Extract XYZ coordinates
+    x = las_file.x
+    y = las_file.y  
+    z = las_file.z
+    
+    # Combine into point cloud array
+    point_cloud = np.column_stack((x, y, z))
+    print(f"Point cloud shape: {point_cloud.shape}")
+    print(f"X range: [{np.min(x):.2f}, {np.max(x):.2f}]")
+    print(f"Y range: [{np.min(y):.2f}, {np.max(y):.2f}]")
+    print(f"Z range: [{np.min(z):.2f}, {np.max(z):.2f}]")
+    
+    # Ground filtering using histogram analysis (same as original MATLAB/Python)
+    z_coords = point_cloud[:, 2]
+    
+    # Create histogram with 50 bins
+    counts, bin_edges = np.histogram(z_coords, bins=50)
+    centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    
+    # Find bin with maximum count (ground level estimation)
+    max_idx = np.argmax(counts)
+    
+    # Ground threshold: 3 bins above the maximum density height
+    ground_height = centers[min(max_idx + 3, len(centers) - 1)]
+    print(f"Estimated ground height: {ground_height:.2f} m")
+    
+    # Extract non-ground points
+    non_ground_mask = point_cloud[:, 2] > ground_height
+    non_ground_points = point_cloud[non_ground_mask]
+    
+    print(f"Non-ground points: {non_ground_points.shape[0]} ({100*non_ground_points.shape[0]/point_cloud.shape[0]:.1f}%)")
+    
+    return non_ground_points
 
 def visualize_points_3d(points, title="Point Cloud", colors=None, save_path=None):
     """
@@ -109,13 +100,11 @@ def visualize_points_3d(points, title="Point Cloud", colors=None, save_path=None
     
     # Set axis limits with some padding (swapped for display)
     padding = 0.1
-    # ax.set_xlim(points[:, 1].min() - y_range * padding, points[:, 1].max() + y_range * padding)
     ax.set_xlim(points[:, 1].max() + y_range * padding, points[:, 1].min() - x_range * padding)
     ax.set_ylim(points[:, 0].min() - x_range * padding, points[:, 0].max() + x_range * padding)
     ax.set_zlim(points[:, 2].min() - z_range * padding, points[:, 2].max() + z_range * padding)
     
     # Set equal aspect ratio for better visualization
-    # Method 1: Force equal aspect ratio (swapped for display)
     max_range = max(x_range, y_range, z_range)
     ax.set_box_aspect([y_range/max_range, x_range/max_range, z_range/max_range])
     
@@ -141,32 +130,79 @@ def show_segs(points, labels, show_plot=True):
         return
     
     # Generate colors for each cluster
-    # 获取所有唯一的簇标签ID
     unique_labels = np.unique(labels)
-    # - plt.cm.tab20是一个颜色映射表，包含20中视觉上区分度比较高的颜色
-    # - np.linspace 会生成一个从0到1的等差数列，数量与簇的数量相同
-    # - 为每个唯一的簇标签，挑选一个独一无二的颜色
     colors = plt.cm.tab20(np.linspace(0, 1, len(unique_labels)))
     
     point_colors = np.zeros((len(points), 3))
-    # 遍历每个簇，为其所有点分配颜色
     for i, label in enumerate(unique_labels):
-        # 创建一个布尔掩码(mask)，用于选中所有属于当前簇(label)的点
         mask = labels == label
         point_colors[mask] = colors[i][:3]
     
     return point_colors
 
-def main():
+def save_results_to_las(power_lines_final, output_path):
     """
-    Main power line extraction pipeline
+    Save the final power line results to a new LAS file
+    
+    Args:
+        power_lines_final: List of PowerLine objects
+        output_path: Output LAS file path
     """
-    print("=== Power Line Extraction from Mobile LiDAR Point Cloud ===")
-    print("Python version - maintaining identical parameters and logic")
+    if not power_lines_final:
+        print("No power lines to save")
+        return
+        
+    # Combine all power line points
+    all_points = np.vstack([pl.Location for pl in power_lines_final])
+    
+    # Create classification labels for each power line
+    all_classifications = []
+    for i, pl in enumerate(power_lines_final):
+        # Use classification value 14 (wire - conductor) + power line index
+        classifications = np.full(pl.Location.shape[0], 14 + i, dtype=np.uint8)
+        all_classifications.append(classifications)
+    all_classifications = np.concatenate(all_classifications)
+    
+    # Create new LAS file
+    header = laspy.LasHeader(point_format=3, version="1.2")
+    header.x_scale = 0.01
+    header.y_scale = 0.01 
+    header.z_scale = 0.01
+    header.x_offset = np.min(all_points[:, 0])
+    header.y_offset = np.min(all_points[:, 1])
+    header.z_offset = np.min(all_points[:, 2])
+    
+    las = laspy.LasData(header)
+    las.x = all_points[:, 0]
+    las.y = all_points[:, 1]
+    las.z = all_points[:, 2]
+    las.classification = all_classifications
+    
+    # Set intensity based on power line index
+    intensity = []
+    for i, pl in enumerate(power_lines_final):
+        pl_intensity = np.full(pl.Location.shape[0], (i + 1) * 1000, dtype=np.uint16)
+        intensity.append(pl_intensity)
+    las.intensity = np.concatenate(intensity)
+    
+    las.write(output_path)
+    print(f"Saved power line results to: {output_path}")
+    print(f"  - {len(power_lines_final)} power lines")
+    print(f"  - {all_points.shape[0]} total points")
+
+def main(las_file_path, output_dir=None):
+    """
+    Main power line extraction pipeline for LAS files
+    
+    Args:
+        las_file_path: Path to input LAS file
+        output_dir: Output directory for results (optional)
+    """
+    print("=== Power Line Extraction from LAS Point Cloud ===")
+    print("Python version - processing single LAS file")
     print()
     
-    # Configuration - Same parameters as MATLAB
-    data_path = "./pointcloud_files"
+    # Configuration - Same parameters as original
     radius = 0.5           # Neighborhood search radius  
     angle_thr = 10         # Angle threshold in degrees
     l_thr = 0.98          # Linearity threshold
@@ -176,12 +212,20 @@ def main():
     min_length = 1.5       # Minimum power line length
     insert_resolution = 0.1 # Point insertion resolution
     
+    # Set output directory
+    if output_dir is None:
+        output_dir = os.path.dirname(las_file_path)
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Get base filename for outputs
+    base_name = os.path.splitext(os.path.basename(las_file_path))[0]
+    
     try:
-        # Step 1: Mobile LiDAR filtering
-        print("Step 1: Mobile LiDAR filtering...")
+        # Step 1: LAS file loading and ground filtering
+        print("Step 1: LAS file loading and ground filtering...")
         start_time = time.time()
         
-        non_ground_points = load_point_cloud_data(data_path)
+        non_ground_points = load_las_point_cloud_data(las_file_path)
         
         end_time = time.time()
         print(f"Ground filtering completed in {end_time - start_time:.2f} seconds")
@@ -189,7 +233,7 @@ def main():
         # Visualize non-ground points
         visualize_points_3d(non_ground_points, 
                           "Non-ground Points",
-                          save_path="f1_nonGroundPoints.png")
+                          save_path=os.path.join(output_dir, f"{base_name}_1_nonGroundPoints.png"))
         
         # Step 2: Extract candidate power line points
         print("\nStep 2: Extracting candidate power line points...")
@@ -202,10 +246,14 @@ def main():
         print(f"Power line extraction completed in {end_time - start_time:.2f} seconds")
         print(f"Found {candidate_points.shape[0]} candidate power line points")
         
+        if candidate_points.shape[0] == 0:
+            print("No candidate power line points found. Exiting.")
+            return None
+        
         # Visualize candidate points
         visualize_points_3d(candidate_points,
                           "Candidate Power Line Points", 
-                          save_path="f2_candidate_powerline_points.png")
+                          save_path=os.path.join(output_dir, f"{base_name}_2_candidate_powerline_points.png"))
         
         # Step 3: Euclidean clustering
         print("\nStep 3: Euclidean clustering...")
@@ -219,7 +267,7 @@ def main():
         visualize_points_3d(candidate_points,
                           "Candidate Power Line Clusters",
                           colors=cluster_colors,
-                          save_path="f3_candidate_powerline_points_clusters.png")
+                          save_path=os.path.join(output_dir, f"{base_name}_3_candidate_powerline_clusters.png"))
         
         # Filter clusters by minimum size
         power_lines_raw = create_power_line_structure(candidate_points, labels, 
@@ -232,10 +280,10 @@ def main():
             
             visualize_points_3d(filtered_points,
                               "Power Line Clusters",
-                              save_path="f4_powerline_points_clusters.png")
+                              save_path=os.path.join(output_dir, f"{base_name}_4_powerline_clusters.png"))
         else:
             print("No valid power line clusters found")
-            return
+            return None
         
         # Step 4: Power line modeling
         print("\nStep 4: Power line modeling...")
@@ -261,13 +309,13 @@ def main():
             visualize_points_3d(all_points,
                               "Different Clusters with Different Colors",
                               colors=all_colors,
-                              save_path="f5_colorization_clusters.png")
+                              save_path=os.path.join(output_dir, f"{base_name}_5_colorization_clusters.png"))
         
         # Sort power lines by count
         counts = [pl.Count for pl in power_lines]
         sorted_indices = np.argsort(counts)[::-1]  # Descending order
         
-        # Multiple rounds of merging (same as MATLAB)
+        # Multiple rounds of merging (same as original)
         print("Performing power line merging...")
         for round_num in range(3):
             power_lines, sorted_indices = merge_power_lines(power_lines, sorted_indices)
@@ -286,11 +334,15 @@ def main():
             visualize_points_3d(merged_points,
                               "Power Line Clusters",
                               colors=merged_colors,
-                              save_path="f6_powerLines_clusters.png")
+                              save_path=os.path.join(output_dir, f"{base_name}_6_powerLines_clusters.png"))
         
         # Filter short power lines
         power_lines = filter_short_power_lines(power_lines, min_length)
         print(f"After length filtering: {len(power_lines)} power lines")
+        
+        if not power_lines:
+            print("No power lines remaining after length filtering")
+            return None
         
         # Calculate total length
         total_length = calculate_total_length(power_lines)
@@ -318,13 +370,18 @@ def main():
             visualize_points_3d(final_points,
                               "Power Line Modeling",
                               colors=final_colors,
-                              save_path="f7_Power_line_model.png")
+                              save_path=os.path.join(output_dir, f"{base_name}_7_Power_line_model.png"))
+        
+        # Save results to LAS file
+        output_las_path = os.path.join(output_dir, f"{base_name}_powerlines.las")
+        save_results_to_las(power_lines_final, output_las_path)
         
         print(f"\n=== Power Line Extraction Complete ===")
         print(f"Final results:")
         print(f"  - Number of power lines: {len(power_lines_final)}")
         print(f"  - Total length: {total_length:.2f} meters")
         print(f"  - Total points in model: {sum([pl.Location.shape[0] for pl in power_lines_final])}")
+        print(f"  - Results saved to: {output_dir}")
         
         return power_lines_final
         
@@ -335,4 +392,19 @@ def main():
         return None
 
 if __name__ == "__main__":
-    result = main()
+    import sys
+    
+    if len(sys.argv) < 2:
+        print("Usage: python extract_powerlines_las.py <las_file_path> [output_dir]")
+        print("Example: python extract_powerlines_las.py ../convert_cloudpoint/Tile_62.las ./output")
+        sys.exit(1)
+    
+    las_file_path = sys.argv[1]
+    output_dir = sys.argv[2] if len(sys.argv) > 2 else None
+    
+    result = main(las_file_path, output_dir)
+    
+    if result:
+        print("Power line extraction completed successfully!")
+    else:
+        print("Power line extraction failed.")

@@ -40,21 +40,25 @@ def get_pca(xyz, r):
         XNN = xyz[neighbors_idx, :]
         
         # Compute covariance matrix
+        # 对于每个点的邻域点集，计算其三维坐标的协方差矩阵
         covm = np.cov(XNN.T)
         
         # Compute eigenvalues and eigenvectors
+        # 特征向量给出了点集分布的三个主方向。最小特征值对应的特征向量就是该点邻域点集的法向量
+        # 特征值表示点集在三个主方向上的离散程度(方差)
         eigenvalues, eigenvectors = eig(covm)
         
         # Convert to real values (eigenvalues should be real for covariance matrix)
         eigenvalues = np.real(eigenvalues)
         eigenvectors = np.real(eigenvectors)
         
-        # Sort eigenvalues in descending order
+        # Sort eigenvalues in descending order 降序排列 λ1最大、λ3最小
         idx = np.argsort(eigenvalues)[::-1]
         eigenvalues = eigenvalues[idx]
         eigenvectors = eigenvectors[:, idx]
         
         # Normal is the eigenvector corresponding to smallest eigenvalue
+        # 将最大特征值对应的特征向量（即点集的主方向）存入normals数组
         normals[i, :] = eigenvectors[:, 0]
         
         # Compute geometric features
@@ -63,6 +67,9 @@ def get_pca(xyz, r):
         lmbda3 = eigenvalues[2]
         
         # Linearity feature (same as MATLAB)
+        # 如果点集呈线状分布，则 λ1 会远大于 λ2 和 λ3，L 的值会趋近于 1
+        # 如果点集呈面状分布，则 λ1 和 λ2 会比较接近，L 的值会趋近于 0
+        # 如果点集呈球状分布，则三个特征值都会很接近，L 的值也趋近于 0
         L = (lmbda1 - lmbda2) / lmbda1
         Ls[i, 0] = L
     
@@ -82,16 +89,20 @@ def extract_pls(non_ground_points, radius, angle_thr, l_thr):
     Returns:
         is_pl_index: Boolean array indicating power line points
     """
-    # Get PCA features
+    # Get PCA features, 所有非地面点的法向量和线性度
+    # normals: 每个点邻域的主方向向量，Ls是每个点邻域点集的线性度
     normals, Ls = get_pca(non_ground_points, radius)
     
     # Calculate angle between normal and vertical direction (0,0,1)
     # Equivalent to: angle = acosd(normals(:,3)./sqrt(sum(normals.^2,2)))
+    # 首先计算每个主方向向量的模长（归一化），然后计算每个点的主方向向量与绝对垂直向量之间的夹角
     normal_magnitudes = np.sqrt(np.sum(normals**2, axis=1))
     angles = np.arccos(normals[:, 2] / normal_magnitudes) * 180 / np.pi
     
     # Apply filters: angle close to 90 degrees and high linearity
     # Equivalent to: isPLIndex = abs(angle - 90) < angleThr & Ls>LThr
+    # 双重条件过滤，找出最有可能是电力线的点
+    # 条件A：点的线性度 条件B：主方向向量必须与垂直方向接近90度
     is_pl_index = (np.abs(angles - 90) < angle_thr) & (Ls[:, 0] > l_thr)
     
     # Handle NaN values
