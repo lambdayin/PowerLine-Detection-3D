@@ -244,7 +244,9 @@ def main():
         labels_fine, num_clusters_fine = euclidean_clustering(filtered_points, min_distance_2)
         print(f"Fine clustering found {num_clusters_fine} clusters")
         
-        # Create power line structures
+        # Create power line structures 精细聚类结果
+        # 为精细聚类结果创建PowerLine结构体
+        # 这里的min_points=1意味着不过滤任何簇，保留所有精细分割结果
         power_lines = create_power_line_structure(filtered_points, labels_fine,
                                                 num_clusters_fine, min_points=1)
         
@@ -264,6 +266,8 @@ def main():
                               save_path="f5_colorization_clusters.png")
         
         # Sort power lines by count
+        # 按照每个电力线簇的点数进行降序排序，获得排序索引
+        # 点数多的簇排在前面，用于后续的合并优化策略
         counts = [pl.Count for pl in power_lines]
         sorted_indices = np.argsort(counts)[::-1]  # Descending order
         

@@ -34,6 +34,7 @@ def euclidean_clustering(points, min_distance):
     # Use DBSCAN for clustering (eps = min_distance, min_samples = 1)
     # min_distance：聚类的最小距离阈值，如果两点之间的距离小于这个值，它们可能被分到同一簇
     # min_samples：确保每个点都会被分配到一个簇，即使是离群点
+    # labels[0] 表示第0个点所属的簇标签
     clustering = DBSCAN(eps=min_distance, min_samples=1).fit(points)
     labels = clustering.labels_
     
@@ -244,10 +245,14 @@ def create_power_line_structure(points_list, labels, num_clusters, min_points=15
     power_lines = []
     
     for i in range(1, num_clusters + 1):  # 1-based labels
+        # 创建一个布尔掩码(mask)，用于选中所有属于当前簇(label)的点
         cluster_mask = labels == i
+        # 根据掩码选中原始电云中属于当前簇的点
         cluster_points = points_list[cluster_mask]
         
+        # 检查当前簇的点数是否满足最小点数要求
         if cluster_points.shape[0] >= min_points:
+            # 如果满足条件，则创建一个新的PowerLine对象
             pl = PowerLine()
             pl.Location = cluster_points
             pl.Label = 0
