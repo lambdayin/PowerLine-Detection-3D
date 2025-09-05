@@ -137,6 +137,8 @@ def eigen_dv(points):
     main_vector = eigenvectors[:, 0]
     
     # Calculate angle in degrees (projection to XY plane)
+    # 计算主方向在XY平面上的投影与X轴之间的夹角
+    # main_vector[1]主方向的y分量，main_vector[0]是x分量
     angle = np.arctan2(main_vector[1], main_vector[0]) * 180 / np.pi
     
     return eigenvalues, eigenvectors, angle
@@ -170,20 +172,32 @@ def get_dist(power_lines):
     Calculate power line length
     Equivalent to getDist.m function
     """
+    # 长度定义为点云在其主方向上的跨度（最大值与最小值的差）
     if power_lines.shape[0] < 3:
         return 0
     
     # Center the points
+    # 步骤1：中心化点云
+    # 将点云的集合中心平移到坐标原点，进行PCA的预处理步骤
     shift = power_lines - np.mean(power_lines, axis=0)
     
     # Get main direction
+    # 步骤2：获取点云的主方向
     eigenvalues, eigenvectors, angle = eigen_dv(shift)
     
     # Rotate to align with main direction
+    # 步骤3：旋转点云
+    # 将点云绕Z轴旋转，使其主方向与X轴对齐
+    # 这样，旋转后点云在X轴上的投影长度即为我们要求的电力线长度
     rotated = rotate_points(shift, -angle * np.pi / 180.0)
+
+    # 步骤4：提取主方向上的坐标
+    # 旋转后，新坐标的X轴代表了电力线的主方向
     shift_x = rotated[:, 0]
     
     # Length is the range in main direction
+    # 长度5：计算长度
+    # 长度即为主方向上的最大坐标与最小坐标的差值
     dist = np.max(shift_x) - np.min(shift_x)
     
     return dist
@@ -197,29 +211,41 @@ def insert_3d(cluster_raw, resolution):
         return cluster_raw
         
     # Center the cluster
+    # 步骤1：中心化与坐标变换，将点云中心平移到原点
     cluster_shift = cluster_raw - np.mean(cluster_raw, axis=0)
     
     # Get main direction using eigen decomposition
     eigenvalues, eigenvectors, angle = eigen_dv(cluster_shift)
     
     # Rotate to align with main axis
+    # 将点云旋转，使其主方向与X轴对齐，将3D问题简化为2D平面上的曲线拟合问题
     rotated = rotate_points(cluster_shift, -angle * np.pi / 180.0)
     x = rotated[:, 0]
     z = rotated[:, 2]
     
     # Fit polynomial (degree 2, same as MATLAB polyfit)
+    # 步骤2：曲线拟合
+    # 使用二次多项式（抛物线）来拟合旋转后的(x, z)二维点，以模拟电力线弧垂形状
     p = np.polyfit(x, z, 2)
     
     # Insert points with given resolution
+    # 步骤3：生成插值点
+    # 根据设定的分辨率，在原始点云x坐标范围内生成一组新的、均匀分布的x坐标
     x_new = insert_points_1d(x, z, p, resolution)
     
     if x_new is None:
         return cluster_raw
         
     # Create new points (y=0 as in MATLAB code)
+    # 步骤4：创建新的三维点
+    # 使用拟合的多项式模型(p)和新生成的x坐标(x_new)计算出对应的z坐标
+    # 在这个简化的二维平面中，y坐标被设置为0
     xyz_new = np.column_stack([x_new, np.zeros(len(x_new)), np.polyval(p, x_new)])
     
     # Rotate back and translate
+    # 步骤5：坐标系逆变换
+    # 将新生成的三维点进行反向旋转，并平移回原始点云的集合中心位置
+    # 从而将插值点从拟合坐标系转换回世界坐标系
     xyz_new = rotate_points(xyz_new, angle * np.pi / 180.0) + np.mean(cluster_raw, axis=0)
     
     return xyz_new
